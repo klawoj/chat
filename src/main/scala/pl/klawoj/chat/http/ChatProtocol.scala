@@ -2,34 +2,27 @@ package pl.klawoj.chat.http
 
 import java.time.Instant
 
-object ChatProtocol {
+sealed trait ChatProtocol
 
-  case class ListAllUserChats(userId: String)
+case class GetAllUserChats(userId: String) extends ChatProtocol
 
 
-  case class StartChat(participants: ChatParticipants) extends BetweenChatParticipants
+case class StartChat(participants: ChatOperationParticipantIds) extends ChatProtocol
 
-  case class GetAllChatMessages(participants: ChatParticipants) extends BetweenChatParticipants
+case class GetAllMessagesInChat(participants: ChatOperationParticipantIds) extends ChatProtocol
 
-  object GetAllChatMessages {
 
-  }
+case class PostMessage(participants: ChatOperationParticipantIds, messageContent: ChatMessageContent) extends ChatProtocol
 
-  case class PostMessage(participants: ChatParticipants, chatMessage: ChatMessage) extends BetweenChatParticipants
+case class OngoingChat(
+                        createdAt: Instant,
+                        participants: ChatOperationParticipantIds,
+                        lastMessage: Option[ChatMessage]
+                      )
 
-  case class OngoingChat(
-                          participants: ChatParticipants,
-                          lastMessage: Option[ChatMessage]
-                        ) extends BetweenChatParticipants
+case class ChatMessage(senderId: String, at: Instant, content: ChatMessageContent)
 
-  case class ChatMessage(at: Instant, content: String)
+case class ChatMessageContent(content: String)
 
-  case class Ack()
+case class ChatOperationParticipantIds(senderId: String, receiverId: String)
 
-  case class ChatParticipants(id1: String, id2: String)
-
-  trait BetweenChatParticipants {
-    def participants: ChatParticipants
-  }
-
-}

@@ -5,7 +5,6 @@ import akka.http.scaladsl.model.{HttpEntity, HttpRequest, StatusCodes, Uri}
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import org.scalatest.matchers.must.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
-import pl.klawoj.chat.http.ChatProtocol.{ChatMessage, OngoingChat}
 import pl.klawoj.chat.http.ChatProtocolMarshaller._
 import pl.klawoj.helpers.ChatRouteTestConfig
 
@@ -18,8 +17,8 @@ class ChatRouteTest extends AnyWordSpecLike with Matchers with ChatRouteTestConf
 
   def getAllChatMessages(myId: String, hisId: String): HttpRequest = Get(Uri(s"/chat/user/${myId}/with/${hisId}/messages"))
 
-  def postMessage(myId: String, hisId: String, message: ChatMessage): HttpRequest = {
-    val json = ChatProtocolMarshaller.chatMessageMarshaller.write(message)
+  def postMessage(myId: String, hisId: String, message: ChatMessageContent): HttpRequest = {
+    val json = ChatProtocolMarshaller.chatMessageContentMarshaller.write(message)
     Post(Uri(s"/chat/user/${myId}/with/${hisId}/messages"), HttpEntity(`application/json`, json))
   }
 
@@ -43,7 +42,7 @@ class ChatRouteTest extends AnyWordSpecLike with Matchers with ChatRouteTestConf
         "return info about the chat created" when {
           "service returns the info properly " in {
             havingStartChatServiceResponseMocked { (participants, _) =>
-              startChat(participants.id1, participants.id2) ~> route ~> check {
+              startChat(participants.senderId, participants.receiverId) ~> route ~> check {
                 status mustBe StatusCodes.Created
               }
             }
@@ -55,7 +54,7 @@ class ChatRouteTest extends AnyWordSpecLike with Matchers with ChatRouteTestConf
         "return all the messages from the given chat" when {
           "service returns the info properly " in {
             havingGetAllChatMessagesResponseMocked { (participants, seq) =>
-              getAllChatMessages(participants.id1, participants.id2) ~> route ~> check {
+              getAllChatMessages(participants.senderId, participants.receiverId) ~> route ~> check {
                 status mustBe StatusCodes.OK
                 responseAs[Seq[ChatMessage]] mustBe seq
               }
@@ -69,7 +68,7 @@ class ChatRouteTest extends AnyWordSpecLike with Matchers with ChatRouteTestConf
         "return info about the chat created" when {
           "service returns the info properly " in {
             havingPostMessageResponseMocked { msg =>
-              postMessage(msg.participants.id1, msg.participants.id2, msg.chatMessage) ~> route ~> check {
+              postMessage(msg.participants.senderId, msg.participants.receiverId, msg.messageContent) ~> route ~> check {
                 status mustBe StatusCodes.Created
               }
             }

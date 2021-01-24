@@ -1,27 +1,37 @@
 package pl.klawoj.chat.http
 
 import akka.NotUsed
+import akka.stream.SourceRef
 import akka.stream.scaladsl.Source
-import pl.klawoj.chat.domain.{ChatQueryService, ChatShard}
-import pl.klawoj.chat.http.ChatProtocol._
-import pl.klawoj.helpers.ServiceCallTimeout
-import pl.klawoj.helpers.ServiceRegistry.askHim
+import pl.klawoj.chat.domain.{ChatQueryService, ChatShard, ChatShardEntity, Convert}
+import pl.klawoj.helpers.ServiceRegistry.askHimByName
+import pl.klawoj.helpers.{Ack, ServiceCallTimeout}
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.chaining.scalaUtilChainingOps
 
 trait ChatRouteFacade extends ServiceCallTimeout {
 
-  def getAllUserChats(userId: String): Future[Source[OngoingChat, NotUsed]] = {
-    askHim[ChatQueryService, Source[OngoingChat, NotUsed]](ListAllUserChats(userId))
-  }
+  implicit val dispatcher: ExecutionContext
+
+  import Convert._
+
+  def getAllUserChats(userId: String): Future[Source[OngoingChat, NotUsed]] =
+    askHimByName[ChatQueryService, SourceRef[OngoingChat]](GetAllUserChats(userId)).map(_.source)
+
 
   def startChat(myId: String, hisId: String): Future[OngoingChat] =
-    askHim[ChatShard, OngoingChat](StartChat(ChatParticipants(myId, hisId)))
+    askHimByName[ChatShard, ChatShardEntity.OngoingChat](StartChat(ChatOperationParticipantIds(myId, hisId))
+      .pipe(toDomain))
+      .map(fromDomain)
 
   def getAllChatMessages(myId: String, hisId: String): Future[Source[ChatMessage, NotUsed]] =
-    askHim[ChatShard, Source[ChatMessage, NotUsed]](GetAllChatMessages(ChatParticipants(myId, hisId)))
+    askHimByName[ChatShard, SourceRef[ChatShardEntity.ChatMessage]](GetAllMessagesInChat(ChatOperationParticipantIds(myId, hisId))
+      .pipe(toDomain))
+      .map(_.source.map(fromDomain))
 
-  def postMessageInChat(myId: String, hisId: String, message: ChatMessage): Future[Ack] =
-    askHim[ChatShard, Ack](PostMessage(ChatParticipants(myId, hisId), message))
+  def postMessageInChat(myId: String, hisId: String, message: ChatMessageContent): Future[Ack] =
+    askHimByName[ChatShard, Ack](PostMessage(ChatOperationParticipantIds(myId, hisId), message)
+      .pipe(toDomain))
 
 }

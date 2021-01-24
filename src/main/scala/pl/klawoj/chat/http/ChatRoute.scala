@@ -1,22 +1,23 @@
 package pl.klawoj.chat.http
 
-import akka.NotUsed
 import akka.actor.ActorContext
 import akka.http.scaladsl.model.StatusCodes.Created
 import akka.http.scaladsl.server.Directives.{complete, get, path, post, _}
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Source
-import pl.klawoj.chat.http.ChatProtocol.ChatMessage
 import pl.klawoj.chat.http.ChatProtocolMarshaller._
 import pl.klawoj.helpers.HttpConfig
 import pl.klawoj.helpers.json.StreamingMarshallers._
 
+import scala.concurrent.ExecutionContext
+
 class ChatRoute(implicit context: ActorContext, httpConfig: HttpConfig) extends ChatRouteFacade {
+
+  override implicit val dispatcher: ExecutionContext = context.dispatcher
 
   val route: Route = {
     pathPrefix("chat" / "user" / Segment) { myId =>
       path("all") {
-        onSuccess(getAllUserChats(myId)) { ongoingChats: Source[ChatProtocol.OngoingChat, NotUsed] =>
+        onSuccess(getAllUserChats(myId)) { ongoingChats =>
           get {
             complete(ongoingChats)
           }
@@ -35,7 +36,7 @@ class ChatRoute(implicit context: ActorContext, httpConfig: HttpConfig) extends 
             }
           } ~
             post {
-              entity(as[ChatMessage]) { message =>
+              entity(as[ChatMessageContent]) { message =>
                 onSuccess(postMessageInChat(myId, hisId, message)) { _ =>
                   complete(Created)
                 }

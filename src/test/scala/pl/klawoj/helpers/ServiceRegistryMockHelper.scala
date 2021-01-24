@@ -41,7 +41,7 @@ trait ServiceRegistryMockHelper {
       sender ! Source(response)
         .toMat(StreamRefs.sourceRef())(Keep.right)
         .run()
-        .pipe(Await.result(_, 3.seconds)).source
+        .pipe(Await.result(_, 3.seconds))
       TestActor.KeepRunning
   }
 }
