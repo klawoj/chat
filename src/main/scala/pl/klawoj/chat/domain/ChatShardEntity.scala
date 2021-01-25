@@ -3,9 +3,12 @@ package pl.klawoj.chat.domain
 import akka.NotUsed
 import akka.actor.{Actor, ActorLogging, ActorRef, PoisonPill, ReceiveTimeout, Stash, Status}
 import akka.cluster.sharding.ShardRegion
+import akka.event.Logging.InfoLevel
+import akka.event.LoggingReceive
 import akka.pattern.pipe
 import akka.stream.scaladsl.{Keep, Sink, Source, StreamRefs}
 import akka.stream.{ActorMaterializer, Materializer}
+import pl.klawoj.chat.db.{ChatMessages, ChatStateRepository, UserService}
 import pl.klawoj.chat.domain.ChatShardEntity.BoundToParticularChat.ChatId
 import pl.klawoj.helpers.Ack
 
@@ -14,7 +17,9 @@ import scala.collection.{SortedSet, immutable}
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContext, Future}
 
-class ChatShardEntity extends Actor with ActorLogging with Stash {
+
+//TODO probably a PersistentActor would be a more elegant solution here
+class ChatShardEntity extends Actor with ActorLogging with Stash with UserService {
 
   import ChatShardEntity._
 
@@ -34,7 +39,7 @@ class ChatShardEntity extends Actor with ActorLogging with Stash {
     case Loaded(ongoingChat, messages) =>
       unstashAll()
       context.setReceiveTimeout(10.minutes)
-      //TODO we could configure that to tweak memory consumption
+      //TODO we could configure that to tweak memory consumption (ReceiveTimeout passivates the entity)
       context become operational(ongoingChat, messages)
 
     case failure: Status.Failure =>
@@ -44,44 +49,52 @@ class ChatShardEntity extends Actor with ActorLogging with Stash {
     case _ => stash()
   }
 
-  def operational(chat: Option[OngoingChat], messages: List[ChatMessage]): Receive = {
+  def operational(chat: Option[OngoingChat], messages: List[ChatMessage]): Receive = LoggingReceive(InfoLevel) {
     case ReceiveTimeout =>
       passivate()
 
     case GetAllMessagesInChat(_) =>
-      sender() ! Source(messages).toMat(StreamRefs.sourceRef())(Keep.right).run()
+      val ref = sender()
+      Source(messages).toMat(StreamRefs.sourceRef())(Keep.right).run() pipeTo ref
 
-    case StartChat(participants) =>
+    case StartChat(participantIds) =>
       val ref = sender()
       chat match {
         case Some(ongoingChat) => ref ! ongoingChat
         case None =>
-          markChatOngoing(participants).map(ChatStartedPersisted) pipeTo self
+          getParticipants(participantIds)
+            .map { participants =>
+              OngoingChat(
+                createdAt = Instant.now(), participants = participants, lastMessage = None
+              )
+            }
+            .flatMap(persistChatState)
+            .map(ChatStatePersisted) pipeTo self
           context.become(waitingForStorage(ref, chat, messages))
       }
 
     case PostMessage(participants, content) =>
       val ref = sender()
       chat match {
-        case Some(_) =>
+        case Some(chatState) =>
           val message = ChatMessage(participants.senderId, Instant.now(), content)
-          postMessage(participants, message).map(_ => MessagePersisted(message)) pipeTo self
+          val newChatState = chatState.withNewMessage(message)
+          persistNewMessage(message, newChatState).map(MessagePersisted.tupled) pipeTo self
           context.become(waitingForStorage(ref, chat, messages))
         case None =>
-          ref ! Status.Failure(new IllegalArgumentException("There is no such conversation"))
+          ref ! Status.Failure(new NoSuchElementException("There is no such conversation"))
       }
-
   }
 
-  def waitingForStorage(sender: ActorRef, chat: Option[OngoingChat], messages: List[ChatMessage]): Receive = {
-    case ChatStartedPersisted(chat) =>
+  def waitingForStorage(sender: ActorRef, chat: Option[OngoingChat], messages: List[ChatMessage]): Receive = LoggingReceive(InfoLevel) {
+    case ChatStatePersisted(chat) =>
       unstashAll()
       sender ! chat
       context.become(operational(Some(chat), messages))
-    case MessagePersisted(message) =>
+    case MessagePersisted(chat, message) =>
       unstashAll()
       sender ! Ack()
-      context.become(operational(chat.map(_.copy(lastMessage = Some(message))), message :: messages))
+      context.become(operational(Some(chat), message :: messages))
     case failure: Status.Failure =>
       unstashAll()
       sender ! failure
@@ -95,20 +108,36 @@ class ChatShardEntity extends Actor with ActorLogging with Stash {
     context.parent ! ShardRegion.Passivate(PoisonPill)
   }
 
-  def getAllChatMessages(chat: ChatId): Future[Source[ChatMessage, NotUsed]] = ???
+  def getAllChatMessages(): Source[ChatMessage, NotUsed] = {
+    ChatMessages.allMessagesForChat(chatId)
+  }
 
-  def getSingleChatInfo(chat: ChatId): Future[Option[OngoingChat]] = ???
+  def getChatInfo(): Future[Option[OngoingChat]] = {
+    ChatStateRepository.forChat(chatId).limit(1).toMat(Sink.headOption)(Keep.right).run()
+  }
 
-  def postMessage(participants: ChatOperationParticipantIds, chatMessage: ChatMessage): Future[Ack] = ???
+  def persistNewMessage(message: ChatMessage, chat: OngoingChat): Future[(OngoingChat, ChatMessage)] = {
+    persistChatState(chat).zip(persistChatMessage(message))
+  }
 
-  def markChatOngoing(participants: ChatOperationParticipantIds): Future[OngoingChat] = ???
+  def persistChatMessage(chatMessage: ChatMessage): Future[ChatMessage] = {
+    ChatMessages.insert(chatId, chatMessage).map(_ => chatMessage)
+  }
+
+  def persistChatState(chat: OngoingChat): Future[OngoingChat] = {
+    Future.sequence(Seq(
+      ChatStateRepository.insertForChat(chatId, chat),
+      ChatStateRepository.insertForUser(chatId.id1, chat),
+      ChatStateRepository.insertForUser(chatId.id2, chat)
+    )).map(_ => chat)
+  }
 
   private def recoverState(): Future[Loaded] = {
     for {
-      info <- getSingleChatInfo(chatId)
-      messagesSource <- info match {
-        case Some(value) => getAllChatMessages(chatId)
-        case None => Future(Source.empty[ChatMessage])
+      info <- getChatInfo()
+      messagesSource = info match {
+        case Some(value) => getAllChatMessages()
+        case None => Source.empty[ChatMessage]
       }
       messages <- messagesSource.runWith(Sink.seq[ChatMessage])
     } yield Loaded(info, messages.toList)
@@ -117,33 +146,41 @@ class ChatShardEntity extends Actor with ActorLogging with Stash {
 
 object ChatShardEntity {
 
-  private case class ChatStartedPersisted(ongoingChat: OngoingChat)
+  private case class ChatStatePersisted(ongoingChat: OngoingChat)
 
-  private case class MessagePersisted(ongoingChat: ChatMessage)
+  private case class MessagePersisted(ongoingChat: OngoingChat, message: ChatMessage)
 
   private case class Loaded(ongoingChat: Option[OngoingChat], messages: List[ChatMessage])
 
-  case class StartChat(participants: ChatOperationParticipantIds) extends BoundToParticularChat
+  case class StartChat(participants: ChatParticipantIds) extends BoundToParticularChat
 
-  case class GetAllMessagesInChat(participants: ChatOperationParticipantIds) extends BoundToParticularChat
+  case class GetAllMessagesInChat(participants: ChatParticipantIds) extends BoundToParticularChat
 
 
-  case class PostMessage(participants: ChatOperationParticipantIds, messageContent: ChatMessageContent) extends BoundToParticularChat
+  case class PostMessage(participants: ChatParticipantIds, messageContent: ChatMessageContent) extends BoundToParticularChat
 
   case class OngoingChat(
                           createdAt: Instant,
-                          participants: ChatOperationParticipantIds,
+                          participants: Seq[Participant],
                           lastMessage: Option[ChatMessage]
-                        )
+                        ) {
+
+    def withNewMessage(chatMessage: ChatMessage): OngoingChat = {
+      copy(lastMessage = Some(chatMessage))
+    }
+
+  }
 
   case class ChatMessage(senderId: String, at: Instant, content: ChatMessageContent)
 
-  case class ChatOperationParticipantIds(senderId: String, receiverId: String)
+  case class Participant(id: String, name: String)
+
+  case class ChatParticipantIds(senderId: String, receiverId: String)
 
   case class ChatMessageContent(content: String)
 
   sealed trait BoundToParticularChat {
-    def participants: ChatOperationParticipantIds
+    def participants: ChatParticipantIds
 
     def chatId: ChatId = ChatId(SortedSet(participants.receiverId, participants.senderId))
   }
@@ -154,6 +191,10 @@ object ChatShardEntity {
       require(ids.size == 2)
 
       override def toString: String = ids.mkString("*")
+
+      def id1: String = ids.head
+
+      def id2: String = ids.toSeq(1)
     }
 
     object ChatId {

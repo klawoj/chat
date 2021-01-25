@@ -10,6 +10,9 @@ trait ConvertToDomain {
   def toDomain(msg: StartChat): ChatShardEntity.StartChat =
     automap(msg).to[ChatShardEntity.StartChat]
 
+  def toDomain(msg: GetAllUserChats): ChatQueryService.GetAllUserChats =
+    automap(msg).to[ChatQueryService.GetAllUserChats]
+
   def toDomain(msg: GetAllMessagesInChat): ChatShardEntity.GetAllMessagesInChat =
     automap(msg).to[ChatShardEntity.GetAllMessagesInChat]
 

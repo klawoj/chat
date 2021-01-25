@@ -7,22 +7,26 @@ sealed trait ChatProtocol
 case class GetAllUserChats(userId: String) extends ChatProtocol
 
 
-case class StartChat(participants: ChatOperationParticipantIds) extends ChatProtocol
+case class StartChat(participants: ChatParticipantIds) extends ChatProtocol
 
-case class GetAllMessagesInChat(participants: ChatOperationParticipantIds) extends ChatProtocol
+case class GetAllMessagesInChat(participants: ChatParticipantIds) extends ChatProtocol
 
 
-case class PostMessage(participants: ChatOperationParticipantIds, messageContent: ChatMessageContent) extends ChatProtocol
+case class PostMessage(participants: ChatParticipantIds, messageContent: ChatMessageContent) extends ChatProtocol
 
 case class OngoingChat(
                         createdAt: Instant,
-                        participants: ChatOperationParticipantIds,
+                        participants: Seq[Participant],
                         lastMessage: Option[ChatMessage]
                       )
+
+case class Participant(id: String, name: String)
+
 
 case class ChatMessage(senderId: String, at: Instant, content: ChatMessageContent)
 
 case class ChatMessageContent(content: String)
 
-case class ChatOperationParticipantIds(senderId: String, receiverId: String)
+case class ChatParticipantIds(senderId: String, receiverId: String)
+
 

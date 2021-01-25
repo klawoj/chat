@@ -10,6 +10,7 @@ import pl.klawoj.helpers.ChatRouteTestConfig
 
 class ChatRouteTest extends AnyWordSpecLike with Matchers with ChatRouteTestConfig with ScalatestRouteTest with ChatRouteTestFixture {
 
+  //TODO test error codes, currently only testing 'happy path'
 
   def getAllUserChats(myId: String): HttpRequest = Get(Uri(s"/chat/user/${myId}/all"))
 

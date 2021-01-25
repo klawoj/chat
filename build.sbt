@@ -14,6 +14,8 @@ val scalaTestMockitoV = "1.0.0-M2"
 val scalaCollectionCompatV = "2.1.3"
 val akkaHttpV = "10.1.11"
 val scalaTestCheckV = "3.1.0.0"
+val alpakkaV = "1.1.2"
+val cassandraUnitV = "3.5.0.1"
 
 lazy val chat = project
   .in(file("."))
@@ -51,7 +53,6 @@ lazy val chat = project
         "com.typesafe.akka" %% "akka-cluster" % akkaV,
         "com.typesafe.akka" %% "akka-cluster-sharding" % akkaV,
         "com.typesafe.akka" %% "akka-cluster-tools" % akkaV,
-        "com.typesafe.akka" %% "akka-cluster-metrics" % akkaV,
         "com.lightbend.akka.management" %% "akka-management-cluster-bootstrap" % "1.0.5",
         "com.typesafe.akka" %% "akka-discovery" % akkaV,
 
@@ -67,8 +68,13 @@ lazy val chat = project
         "org.scala-lang" % "scala-reflect" % scalaV,
         "org.scalaz" %% "scalaz-core" % scalazV,
 
+        "com.lightbend.akka" %% "akka-stream-alpakka-cassandra" % alpakkaV exclude("com.datastax.cassandra", "cassandra-driver-core"),
+        "io.netty" % "netty-transport-native-epoll" % "4.1.28.Final" classifier "linux-x86_64",
+        "com.datastax.cassandra" % "cassandra-driver-core" % "3.6.0",
+        "org.cassandraunit" % "cassandra-unit" % cassandraUnitV % Test exclude("com.datastax.cassandra", "cassandra-driver-core"),
 
         "com.typesafe.akka" %% "akka-slf4j" % akkaV,
-        "ch.qos.logback" % "logback-classic" % logBackV
+        "ch.qos.logback" % "logback-classic" % logBackV,
+
       )
     })

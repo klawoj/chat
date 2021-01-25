@@ -10,40 +10,45 @@ import pl.klawoj.helpers.json.StreamingMarshallers._
 
 import scala.concurrent.ExecutionContext
 
-class ChatRoute(implicit context: ActorContext, httpConfig: HttpConfig) extends ChatRouteFacade {
+class ChatRoute(implicit context: ActorContext, httpConfig: HttpConfig) extends ChatRouteFacade with ExceptionHandling {
 
   override implicit val dispatcher: ExecutionContext = context.dispatcher
 
   val route: Route = {
-    pathPrefix("chat" / "user" / Segment) { myId =>
-      path("all") {
-        onSuccess(getAllUserChats(myId)) { ongoingChats =>
-          get {
-            complete(ongoingChats)
-          }
-        }
-      } ~ pathPrefix("with" / Segment) { hisId =>
-        path("start") {
-          put {
-            onSuccess(startChat(myId, hisId)) { ongoingChat =>
-              complete(Created)
+
+
+    handleExceptions(exceptionHandler()) {
+
+      pathPrefix("chat" / "user" / Segment) { myId =>
+        path("all") {
+          onSuccess(getAllUserChats(myId)) { ongoingChats =>
+            get {
+              complete(ongoingChats)
             }
           }
-        } ~ path("messages") {
-          get {
-            onSuccess(getAllChatMessages(myId, hisId)) { messages =>
-              complete(messages)
-            }
-          } ~
-            post {
-              entity(as[ChatMessageContent]) { message =>
-                onSuccess(postMessageInChat(myId, hisId, message)) { _ =>
-                  complete(Created)
-                }
+        } ~ pathPrefix("with" / Segment) { hisId =>
+          path("start") {
+            put {
+              onSuccess(startChat(myId, hisId)) { ongoingChat =>
+                complete(Created)
               }
             }
-        }
+          } ~ path("messages") {
+            get {
+              onSuccess(getAllChatMessages(myId, hisId)) { messages =>
+                complete(messages)
+              }
+            } ~
+              post {
+                entity(as[ChatMessageContent]) { message =>
+                  onSuccess(postMessageInChat(myId, hisId, message)) { _ =>
+                    complete(Created)
+                  }
+                }
+              }
+          }
 
+        }
       }
     }
   }
@@ -51,5 +56,6 @@ class ChatRoute(implicit context: ActorContext, httpConfig: HttpConfig) extends 
 
 object ChatRoute {
   def route(implicit context: ActorContext, httpConfig: HttpConfig): Route = new ChatRoute().route
+
 
 }

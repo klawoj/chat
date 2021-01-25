@@ -1,7 +1,7 @@
 package pl.klawoj.chat
 
 import akka.actor.{Actor, ActorLogging}
-import pl.klawoj.chat.domain.ChatShard
+import pl.klawoj.chat.domain.{ChatQueryService, ChatShard}
 import pl.klawoj.chat.http.ChatRoute
 import pl.klawoj.helpers.{ActorEmptyReceive, ActorFactory, HttpConfig, HttpEndpoint}
 
@@ -11,6 +11,7 @@ class TopSupervisor extends Actor with ActorLogging with ActorEmptyReceive {
 
   HttpEndpoint.actor(ChatRoute.route, httpConfig)
   ChatShard.actor
+  ChatQueryService.actor
 }
 
 object TopSupervisor extends ActorFactory[TopSupervisor] {

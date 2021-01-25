@@ -10,13 +10,19 @@ trait ChatGen {
 
   def genId(): Gen[String] = Gen.uuid.map(_.toString)
 
-  def genParticipants(): Gen[ChatOperationParticipantIds] = for {
+  def genParticipantIds(): Gen[ChatParticipantIds] = for {
     id1 <- genId()
     id2 <- genId().suchThat(_ != id1)
-  } yield ChatOperationParticipantIds(id1, id2)
+  } yield ChatParticipantIds(id1, id2)
+
+  def genParticipant(): Gen[Participant] = for {
+    id <- genId()
+    name <- Gen.alphaNumStr
+  } yield Participant(id, name)
+
 
   def genPostMessage(): Gen[PostMessage] = for {
-    p <- genParticipants()
+    p <- genParticipantIds()
     msg <- genChatMessageContent()
   } yield PostMessage(p, msg)
 
@@ -31,7 +37,7 @@ trait ChatGen {
 
   def genOngoingChat(): Gen[OngoingChat] = for {
     createdAt <- genInstant()
-    participants <- genParticipants()
+    participants <- Gen.listOfN(2, genParticipant())
     lastMessage <- Gen.option(genChatMessage())
   } yield OngoingChat(createdAt, participants, lastMessage)
 }
