@@ -3,6 +3,7 @@ DOMAIN ASSUMPTIONS
 -I assume I have access to an UserService that for userId will return userName if the user exists
 -I will use dummy UserService that has several hardcoded entries as an implementation
 -Users of my API have to know their IDs to do anything (REST api is based on IDs not names) so they have to have access to some user list
+-Simple authentication = checking UserService for existence of both users when creating a chat
 -Starting a chat that already exists will return OK, but it won't change app state in any way
 -Listing all messages of a chat that does not exists will return empty list
 -Users local timestamps are not passed in any way to the server. Messages are stored with server timestamp.

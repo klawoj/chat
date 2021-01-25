@@ -8,7 +8,7 @@ import akka.event.LoggingReceive
 import akka.pattern.pipe
 import akka.stream.scaladsl.{Keep, Sink, Source, StreamRefs}
 import akka.stream.{ActorMaterializer, Materializer}
-import pl.klawoj.chat.db.{ChatMessages, ChatStateRepository, UserService}
+import pl.klawoj.chat.db.{ChatMessageRepository, OngoingChatRepository, UserService}
 import pl.klawoj.chat.domain.ChatShardEntity.BoundToParticularChat.ChatId
 import pl.klawoj.helpers.Ack
 
@@ -41,7 +41,6 @@ class ChatShardEntity extends Actor with ActorLogging with Stash with UserServic
       context.setReceiveTimeout(10.minutes)
       //TODO we could configure that to tweak memory consumption (ReceiveTimeout passivates the entity)
       context become operational(ongoingChat, messages)
-
     case failure: Status.Failure =>
 
       log.error(failure.cause, "Unable to recover: " + chatId)
@@ -69,7 +68,7 @@ class ChatShardEntity extends Actor with ActorLogging with Stash with UserServic
               )
             }
             .flatMap(persistChatState)
-            .map(ChatStatePersisted) pipeTo self
+            .map(OngoingChatPersisted) pipeTo self
           context.become(waitingForStorage(ref, chat, messages))
       }
 
@@ -87,7 +86,7 @@ class ChatShardEntity extends Actor with ActorLogging with Stash with UserServic
   }
 
   def waitingForStorage(sender: ActorRef, chat: Option[OngoingChat], messages: List[ChatMessage]): Receive = LoggingReceive(InfoLevel) {
-    case ChatStatePersisted(chat) =>
+    case OngoingChatPersisted(chat) =>
       unstashAll()
       sender ! chat
       context.become(operational(Some(chat), messages))
@@ -109,11 +108,11 @@ class ChatShardEntity extends Actor with ActorLogging with Stash with UserServic
   }
 
   def getAllChatMessages(): Source[ChatMessage, NotUsed] = {
-    ChatMessages.allMessagesForChat(chatId)
+    ChatMessageRepository.allMessagesForChat(chatId)
   }
 
   def getChatInfo(): Future[Option[OngoingChat]] = {
-    ChatStateRepository.forChat(chatId).limit(1).toMat(Sink.headOption)(Keep.right).run()
+    OngoingChatRepository.forChat(chatId).limit(1).toMat(Sink.headOption)(Keep.right).run()
   }
 
   def persistNewMessage(message: ChatMessage, chat: OngoingChat): Future[(OngoingChat, ChatMessage)] = {
@@ -121,14 +120,14 @@ class ChatShardEntity extends Actor with ActorLogging with Stash with UserServic
   }
 
   def persistChatMessage(chatMessage: ChatMessage): Future[ChatMessage] = {
-    ChatMessages.insert(chatId, chatMessage).map(_ => chatMessage)
+    ChatMessageRepository.insert(chatId, chatMessage).map(_ => chatMessage)
   }
 
   def persistChatState(chat: OngoingChat): Future[OngoingChat] = {
     Future.sequence(Seq(
-      ChatStateRepository.insertForChat(chatId, chat),
-      ChatStateRepository.insertForUser(chatId.id1, chat),
-      ChatStateRepository.insertForUser(chatId.id2, chat)
+      OngoingChatRepository.insertForChat(chatId, chat),
+      OngoingChatRepository.insertForUser(chatId.id1, chat),
+      OngoingChatRepository.insertForUser(chatId.id2, chat)
     )).map(_ => chat)
   }
 
@@ -146,7 +145,7 @@ class ChatShardEntity extends Actor with ActorLogging with Stash with UserServic
 
 object ChatShardEntity {
 
-  private case class ChatStatePersisted(ongoingChat: OngoingChat)
+  private case class OngoingChatPersisted(chat: OngoingChat)
 
   private case class MessagePersisted(ongoingChat: OngoingChat, message: ChatMessage)
 
@@ -177,7 +176,7 @@ object ChatShardEntity {
 
   case class ChatParticipantIds(senderId: String, receiverId: String)
 
-  case class ChatMessageContent(content: String)
+  case class ChatMessageContent(text: String)
 
   sealed trait BoundToParticularChat {
     def participants: ChatParticipantIds

@@ -14,7 +14,7 @@ import java.lang.{Long => JavaLong}
 import java.nio.ByteBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
-object ChatStateRepository {
+object OngoingChatRepository {
 
   import CassandraSerialization._
 

@@ -25,7 +25,7 @@ case class Participant(id: String, name: String)
 
 case class ChatMessage(senderId: String, at: Instant, content: ChatMessageContent)
 
-case class ChatMessageContent(content: String)
+case class ChatMessageContent(text: String)
 
 case class ChatParticipantIds(senderId: String, receiverId: String)
 

@@ -15,7 +15,7 @@ import java.lang.{Long => JavaLong}
 import java.nio.ByteBuffer
 import scala.concurrent.{ExecutionContext, Future}
 
-object ChatMessages {
+object ChatMessageRepository {
 
   private val incomingBuffer = 10
 
@@ -34,7 +34,7 @@ object ChatMessages {
 
 
   def allMessagesForChat(chatId: ChatId)(implicit executionContext: ExecutionContext): Source[ChatMessage, NotUsed] =
-    ChatMessages.source(Queries.messagesForChat, chatId.ids.toSeq)
+    ChatMessageRepository.source(Queries.messagesForChat, chatId.ids.toSeq)
 
   private def insert(incomingStatement: PreparedStatement, bind: Seq[Object])(implicit executionContext: ExecutionContext): Future[Ack] = {
     val statement: BoundStatement = incomingStatement.bind(bind.toArray: _*)

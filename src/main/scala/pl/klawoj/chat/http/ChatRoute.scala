@@ -21,15 +21,15 @@ class ChatRoute(implicit context: ActorContext, httpConfig: HttpConfig) extends 
 
       pathPrefix("chat" / "user" / Segment) { myId =>
         path("all") {
-          onSuccess(getAllUserChats(myId)) { ongoingChats =>
+          onSuccess(getAllUserChats(myId)) { chats =>
             get {
-              complete(ongoingChats)
+              complete(chats)
             }
           }
         } ~ pathPrefix("with" / Segment) { hisId =>
           path("start") {
             put {
-              onSuccess(startChat(myId, hisId)) { ongoingChat =>
+              onSuccess(startChat(myId, hisId)) { chat =>
                 complete(Created)
               }
             }

@@ -4,7 +4,7 @@ import akka.actor.{Actor, ActorRef}
 import akka.pattern.pipe
 import akka.stream.scaladsl.{Keep, StreamRefs}
 import akka.stream.{ActorMaterializer, Materializer}
-import pl.klawoj.chat.db.ChatStateRepository
+import pl.klawoj.chat.db.OngoingChatRepository
 import pl.klawoj.chat.domain.ChatQueryService.GetAllUserChats
 import pl.klawoj.helpers.{ActorFactory, ServiceRegistry}
 
@@ -18,7 +18,7 @@ class ChatQueryService extends Actor {
   override def receive: Receive = {
     case GetAllUserChats(userId) =>
       val ref = sender()
-      ChatStateRepository.forUser(userId).toMat(StreamRefs.sourceRef())(Keep.right).run().pipeTo(ref)
+      OngoingChatRepository.forUser(userId).toMat(StreamRefs.sourceRef())(Keep.right).run().pipeTo(ref)
   }
 }
 
