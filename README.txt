@@ -58,7 +58,7 @@ So if we have 1M concurrent chats and 100M messages I could change my solution a
 -measure actual usage and setup proper timeout for Entity passivation
 -introduce GetLastNMessagesInChat(n) or GetMessagesInChatSince(time) operations and force clients to use it instead of GetAllMessagesInChat.
 -introduce WebSocket operation mentioned earlier so that message is pushed immediately to the client if user is connected.
--using GetLastNMessagesInChat(n) together with WebSocket connection could in practise eliminate the need to use GetAllMessagesInChat or to keep messages in memory,
+-using GetLastNMessagesInChat(n) together with WebSocket connection could in practice eliminate the need to use GetAllMessagesInChat or to keep messages in memory,
 
 So the last operation is GetAllUserChats. This one I will simply delegate to be streamed from storage (table dedicated for that query).
 
