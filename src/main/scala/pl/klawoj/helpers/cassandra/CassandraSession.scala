@@ -26,7 +26,7 @@ object CassandraSession {
     new QueryOptions()
       .setFetchSize(1000)
 
-  private def cluster: Cluster = Cluster.builder
+  def cluster: Cluster = Cluster.builder
     .addContactPoints(cassandraConfig.seeds: _*)
     .withPort(cassandraConfig.port)
     .withCredentials(cassandraConfig.user, cassandraConfig.password)

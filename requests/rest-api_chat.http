@@ -1,0 +1,22 @@
+### START NEW CONVERSATION
+PUT http://localhost:11080/chat/user/1/with/2/start
+Accept: application/json
+Content-Type: application/json
+
+### GET ALL MESSAGES FOR CONVERSATION
+GET http://localhost:11080/chat/user/1/with/2/messages
+Accept: application/json
+
+### POST MESSAGE IN CONVERSATION
+POST http://localhost:11080/chat/user/2/with/1/messages
+Accept: application/json
+Content-Type: application/json
+
+{
+  "text": "Hi there!"
+}
+
+### ALL CONVERSATIONS FOR USER
+GET http://localhost:11080/chat/user/1/all
+Accept: application/json
+

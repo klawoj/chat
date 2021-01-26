@@ -1,8 +1,8 @@
 drop
-    keyspace "chat";
+keyspace if exists "chat";
 
 create
-    keyspace "chat" with replication = {
+keyspace "chat" with replication = {
     'class': 'SimpleStrategy',
     'replication_factor': 1
     };

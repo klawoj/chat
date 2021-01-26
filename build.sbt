@@ -20,6 +20,7 @@ val cassandraUnitV = "3.5.0.1"
 lazy val chat = project
   .in(file("."))
   .settings(
+    parallelExecution in Global := false,
     scalaVersion := scalaV,
     name := "chat",
     organization := "pl.klawoj",
@@ -63,10 +64,12 @@ lazy val chat = project
         "org.scalatestplus" %% "scalacheck-1-14" % scalaTestCheckV % Test,
         "org.mockito" % "mockito-core" % mockitoV % Test,
         "com.softwaremill.diffx" %% "diffx-scalatest" % "0.3.16" % Test,
+        "com.github.docker-java" % "docker-java" % "3.1.5" % Test,
         "io.bfil" %% "automapper" % "0.7.0",
         "com.github.alexarchambault" %% "scalacheck-shapeless_1.14" % "1.2.3",
         "org.scala-lang" % "scala-reflect" % scalaV,
         "org.scalaz" %% "scalaz-core" % scalazV,
+        "com.softwaremill.quicklens" %% "quicklens" % "1.6.1",
 
         "com.lightbend.akka" %% "akka-stream-alpakka-cassandra" % alpakkaV exclude("com.datastax.cassandra", "cassandra-driver-core"),
         "io.netty" % "netty-transport-native-epoll" % "4.1.28.Final" classifier "linux-x86_64",
