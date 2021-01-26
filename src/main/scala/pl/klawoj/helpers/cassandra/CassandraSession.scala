@@ -3,9 +3,8 @@ package pl.klawoj.helpers.cassandra
 import akka.actor.{ActorSystem, Scheduler}
 import akka.pattern.retry
 import com.datastax.driver.core._
-import com.datastax.driver.core.policies.{ConstantReconnectionPolicy, LatencyAwarePolicy, RoundRobinPolicy, TokenAwarePolicy}
+import com.datastax.driver.core.policies.ConstantReconnectionPolicy
 
-import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.DurationLong
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -34,13 +33,6 @@ object CassandraSession {
     .withPoolingOptions(poolingOptions)
     .withQueryOptions(queryOptions)
     .withReconnectionPolicy(new ConstantReconnectionPolicy(1000))
-    .withLoadBalancingPolicy(LatencyAwarePolicy.builder(new TokenAwarePolicy(new RoundRobinPolicy()))
-      .withExclusionThreshold(2.0)
-      .withScale(100, TimeUnit.MILLISECONDS)
-      .withRetryPeriod(10, TimeUnit.SECONDS)
-      .withUpdateRate(100, TimeUnit.MILLISECONDS)
-      .withMininumMeasurements(50)
-      .build())
     .build
 
   implicit lazy val session: Session =
